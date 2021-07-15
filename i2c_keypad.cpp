@@ -1,5 +1,3 @@
-#include <Wire.h>
-
 /*
  *  i2ckeypad.cpp v0.1 - keypad/I2C expander interface for Arduino
  *
@@ -43,12 +41,12 @@
  *  ... and sorry for my poor english!
  */
 
-#include "i2ckeypad.h"
+#include "i2c_keypad.h"
 #include <Wire.h>
 
-extern "C" {
-  #include "WConstants.h"
-}
+//extern "C" {
+//  #include "WConstants.h"
+//}
 
 
 /*
@@ -75,7 +73,6 @@ extern "C" {
  *
  *  Default key mapping for 4x4 keypads, you can change it here if you have or
  *  like different keys
- */
 
 const char keymap[4][5] =
 {
@@ -83,6 +80,16 @@ const char keymap[4][5] =
   "456B",
   "789C",
   "*0#D"
+};
+
+*/
+
+const char keymap[4][5] =
+{
+  "Y963",
+  "0852",
+  "N741",
+  "????"
 };
 
 
@@ -210,7 +217,8 @@ void i2ckeypad::pcf8574_write(int addr, int data)
   current_data = data;
 
   Wire.beginTransmission(addr);
-  Wire.send(data);
+//  Wire.send(data);
+  Wire.write(data);
   Wire.endTransmission();
 }
 
@@ -218,6 +226,6 @@ int i2ckeypad::pcf8574_byte_read(int addr)
 {
   Wire.requestFrom(addr, 1);
 
-  return Wire.receive();
+//  return Wire.receive();
+  return Wire.read();
 }
-
