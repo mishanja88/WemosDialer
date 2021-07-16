@@ -5,6 +5,7 @@
 
 #pragma pack(push, 1)
 
+#define DIAL_PREFIX_SIZE 10
 struct DeviceSettings
 {
    bool isSoundEnabled : 1;
@@ -13,9 +14,12 @@ struct DeviceSettings
    
    uint8_t brightness;
 
-   char dialPrefix[10];
+   char dialPrefix[ DIAL_PREFIX_SIZE ];
 };
 
+#define PHONEBOOK_SIZE 100
+
+#define ENTRY_DESC_SIZE 28
 struct BookEntry
 {
   bool isMobile : 1; 
@@ -23,7 +27,7 @@ struct BookEntry
   uint32_t num1;
   uint32_t num2;
 
-  char desc[ 28 ];
+  char desc[ ENTRY_DESC_SIZE ];
 };
 
 #pragma pack(pop)

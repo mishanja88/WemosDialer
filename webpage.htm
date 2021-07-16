@@ -35,6 +35,31 @@ table.header-item {
 
 <table class='main-header'>
 <tr>
+<td>
+<h1>Отладка порта RS232</h1>
+<pre>
+AT
+OK
+ATDT 123456789;
+OK
+</pre>
+<form action="/port.php" method="POST" autocomplete="off">
+<table class='header-item'>
+<tr>
+<td width='100%'>
+ <input type="text" name="text" value="" placeholder="Команда" required style='width: 100%;'>
+</td>
+<td>
+ <input type="submit" value="Записать">
+</td>
+<td width="100%">
+</td>
+</tr>
+</table>
+</form>
+</td>
+</tr>
+<tr>
 <td valign='top'>
 
 <h1>Добавить запись</h1>
@@ -87,6 +112,12 @@ table.header-item {
    <input type="text" name="mobilePrefix" value="8W" required style='width: 100%;' pattern='[0-9W,]+'>
  </td>
 <tr>
+ <td colspan='2'>
+  Яркость<br>
+  <center>0<input type="range" name="brightness" min="0" max="10" value="9" step="1">10</center>
+ </td>
+</tr> 
+<tr>
  <td>
    Метод набора<br>
    <input name="isPulse" type="radio" value="true" checked>Импульсный<br>
@@ -99,9 +130,7 @@ table.header-item {
  </td>
 </tr>
 <tr>
- <td colspan='1'>
- </td>
- <td align='right'>
+ <td align='right' colspan='2'>
   <input type="submit" value="Записать">
  </td>
 </tr>
