@@ -1,133 +1,208 @@
-int g_state = 0;
-long g_state_time = 0;
+#include <EEPROM.h>
 
-int g_digit = 0;
-char g_display[2];
-bool g_isBlink = false;
+#include "Wire.h"
 
-void set_state(int state)
+#include "wifi_mode.h"
+#include "sound_beep.h"
+#include "led_display.h"
+#include "i2c_keypad.h"
+
+#define I2C_KEYPAD_ADDRESS 0x20
+i2ckeypad keyPad(I2C_KEYPAD_ADDRESS);
+
+uint32_t start, stop;
+uint32_t lastKeyPressed = 0;
+
+char last_key = '\0';  // N = Nokey, F = Fail
+bool g_is_wifi_mode;
+
+Font g_digits[2];
+int g_digit_index = 0;
+
+enum State {
+  S_INIT,
+  S_DIGIT,
+  S_DIAL
+};
+
+State g_state;
+uint32_t g_state_millis;
+
+void set_state(State next)
 {
-    g_state = state;
-    g_state_time = millis();
+  g_state = next;
+  g_state_millis = millis();
 }
 
-void enter_state_error( int errCode )
-{
-    sound_beep( BEEP_ERROR );
-    led_print( FNT_ERR, errCode );
-    
-    cli();
-    sleep_enable();
-    sleep_cpu();
+void setup() {
+  led_init();
+  g_is_wifi_mode = wifi_is_enabled();
+  EEPROM.begin(4096);  //Initialize EEPROM
+
+  if (g_is_wifi_mode)
+  {
+    wifi_setup();
+    sound_beep(SB_MODE_WIFI);
+    led_print( FNT_WIFI_0, FNT_WIFI_1 );
+  }
+  else
+  {
+    wifi_disable();
+    sound_beep(SB_MODE_WORK);
+    set_state(S_INIT);
+  }
+
+  Wire.begin();
+  Wire.setClock(400000);
+
+  Wire.beginTransmission(I2C_KEYPAD_ADDRESS);
+  if (Wire.endTransmission() != 0)
+  {
+    led_print( FNT_ERR, FNT_0 );
+
+    while (1)
+    {
+      sound_beep(SB_MODE_FAILURE);
+    }
+  }
+
+  keyPad.init();
+  last_key = keyPad.get_key();
 }
 
-void setup()
-{   
-    led_init();
-    
-    if(!init_keyboard())
-        enter_state_error(0);
-        
-    led_print( FNT_SPLASH_0, FNT_SPLASH_1 );
-    delay(1000);
-    
-    g_state = STATE_CHECK_WIFI_SWITCH;
-}
+char pStrNum = '0';
 
+/*
+  NO CARRIER
+  NO DIALTONE
+  BUSY
+  RING
+  OK
+
+  выкл динамик
+  ATM0
+
+  ATDP 8W9219292306;
+  ATDT 8W9219292306;
+  ATH
+
+*/
 
 void loop()
 {
-    switch(g_state)
-    {
-        case STATE_CHECK_WIFI_SWITCH:
-        {
-            if(is_wifi_mode_on())
-            {
-                init_network();
-                led_print( FNT_WIFI_0, FNT_WIFI_1 );
-                set_state( STATE_WIFI );
-            }
-            else
-            {
-                set_state( STATE_DIGIT );
-                g_digit = 0;
-                g_display[0] = FNT_SPACE;
-                g_display[1] = FNT_SPACE;
-                led_print( FNT_SPACE, FNT_SPACE );
-            }
-            sound_beep( BEEP_READY );            
-        }
-        break;
-        
-        case STATE_WIFI:
-        {
-            if(keyboard_pressed_key() == BTN_CANCEL)
-            {
-                deinit_network();
-                sound_beep( BEEP_CANCEL );
-                set_state( STATE_CHECK_WIFI_SWITCH );
-            }
-        }
-        break;
-            
-        case STATE_DIGIT:
-        {
-            if(g_digit < 2) // blinking dot
-            {
-                bool isBlink = (millis() / 500) & 1;
-                if(isBlink != g_isBlink)
-                {
-                    g_isBlink = isDot;
-                    g_display[ g_digit ] = isDot ? FNT_DOT : FNT_SPACE;
-                    led_print( g_display[0], g_display[1]);
-                }
-            }
-            
-            int key = keyboard_pressed_key();
-            if(key == BTN_CANCEL || // cancel by user
-                abs(millis() - g_state_time) > STATE_TIMEOUT_MILLIS || // cancel by timeout
-                (key == BTN_OK && g_digit == 0) ||  // dial, but no digits entered   
-                (key != BTN_OK && g_digit >= 2)  // number, but all digits entered   
-            )              
-            {
-                sound_beep( BEEP_CANCEL );
-                set_state( STATE_CHECK_WIFI_SWITCH );
-                return;
-            }
-            
-            if(key == BTN_NONE)
-                return;
-            
-            if(key == BTN_OK)
-            {
-                set_state( STATE_DIAL );
-                return;
-            }
-            
-            g_display[ g_digit ] = key;
-            led_print( g_display[0], g_display[1]);
-            g_digit++;   
-            
-            sound_beep( BEEP_NUMBER );
-        }    
-        break;
-            
-        case STATE_DIAL:
-        {
-            int num = g_display[0];
-            if(g_digit == 2)
-                num = num*10 + g_display[1];
+  if (g_is_wifi_mode)
+  {
+    wifi_loop();
+    return;
+  }
 
-            sound_beep( BEEP_DIAL );
-            
-            int errCode = dial_by_memory_index( num );
-            if(errCode)
-                enter_state_error( errCode );
-            else
-                set_state( STATE_CHECK_WIFI_SWITCH );
+  uint32_t now = millis();
+  if (now - g_state_millis > 30000)
+    set_state(S_INIT);
+
+  switch (g_state)
+  {
+    case S_INIT:
+      {
+        g_digits[0] = g_digits[1] = FNT_SPACE;
+        g_digit_index = 0;
+
+        led_print( FNT_SPACE, FNT_SPACE );
+        set_state(S_DIGIT);
+      }
+      break;
+
+    case S_DIGIT:
+      {
+        if (g_digit_index < 2) // blinking dot
+        {
+          Font isBlink = ((now / 500) & 1) ? FNT_DOT : FNT_SPACE;
+          if (g_digits[ g_digit_index ] != isBlink)
+          {
+            g_digits[ g_digit_index ] = isBlink;
+            led_print( g_digits[0], g_digits[1]);
+          }
         }
-        break;        
+
+        char key = keyPad.get_key();
+        if (key == last_key)
+           return;
+  
+        last_key = key;
+
+        if(key == '\0')
+           return;
         
-        default: break;
-    }    
+        if (key == 'N' || // cancel by user
+            //abs(millis() - g_state_time) > STATE_TIMEOUT_MILLIS || // cancel by timeout
+            (key == 'Y' && g_digit_index == 0) ||  // dial, but no digits entered
+            (key != 'Y' && g_digit_index >= 2)  // number, but all digits entered
+           )
+        {
+          sound_beep( SB_CANCEL );
+          set_state( S_INIT );
+          return;
+        }
+
+        if (key == 'Y')
+        {
+          set_state( S_DIAL );
+          return;
+        }
+
+        g_digits[ g_digit_index ] = (Font)( key - '0');
+        led_print( g_digits[0], g_digits[1]);
+        g_digit_index++;
+
+        sound_beep( SB_NUMBER );
+      }
+      break;
+
+    case S_DIAL:
+    {
+        sound_beep( SB_DIAL );
+        set_state(S_INIT);
+    }
+    break;
+  }
+/*
+  char key = keyPad.get_key();
+
+  if (key != last_key)
+  {
+    last_key = key;
+
+    if (key != '\0')
+    {
+      tone(D4, 4000, 100);
+      tone(D4, 8000, 100);
+      if (key == 'Y' || key == 'N')
+        key = FNT_DOT;
+      else
+        key -= '0';
+      // drawString(&key, 1, x, 0);
+      // lmd.display();
+      led_print( (Font) key, FNT_DOT);
+    }
+  }
+
+*/
+  /*
+
+    // Draw the text to the current position
+    int len = strlen(text);
+    drawString(text, len, x, 0);
+    // In case you wonder why we don't have to call lmd.clear() in every loop: The font has a opaque (black) background...
+
+    // Toggle display of the new framebuffer
+    lmd.display();
+
+    // Wait to let the human read the display
+    delay(ANIM_DELAY);
+
+    // Advance to next coordinate
+    if( --x < len * -8 ) {
+      x = LEDMATRIX_WIDTH;
+    }
+  */
 }
