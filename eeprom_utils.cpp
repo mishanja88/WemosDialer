@@ -6,9 +6,6 @@
 DeviceSettings eeprom_read_settings()
 {
     DeviceSettings result;
-    memset(&result, 0, sizeof(DeviceSettings));
-    return result;
-    
     EEPROM.get(SETTINGS_OFFSET, result);
     
     if(result.brightness > 10)
@@ -48,12 +45,29 @@ void eeprom_write_settings(DeviceSettings val)
     EEPROM.commit();
 }
 
+String read_number(const BookEntry &entry)
+{
+    String result;
+    for(int i = 0; i < ENTRY_NUM_SIZE; ++i)
+    {
+       uint8_t src0 = entry.num[i] >> 4;
+       uint8_t src1 = entry.num[i] & 0xF;
+       if(src0 >= 10)
+          break;
+       else
+          result += char('0' + src0);
 
+       if(src1 >= 10)
+          break;
+       else
+          result += char('0' + src1);
+    }
+    
+    return result;  
+}
 
 String eeprom_read_printable(int idx)
-{
-    return String();
-  
+{  
     if (idx < 0 || idx >= PHONEBOOK_SIZE)
         return String();
     
@@ -65,24 +79,14 @@ String eeprom_read_printable(int idx)
     {
         result += "+7 ";
     }
-    
-    if(entry.num0 > 0)
-        result += String(entry.num0, DEC);
-    
-    if(entry.num1 > 0)
-        result += String(entry.num1, DEC);
-    
-    if(entry.num2 > 0)
-        result += String(entry.num2, DEC);
+
+    result += read_number(entry);
     
     return result;
 }
 
 String eeprom_read_dialable(int idx)
-{
-    return String();
-
-  
+{  
     if (idx < 0 || idx >= PHONEBOOK_SIZE)
         return String();
     
@@ -102,18 +106,9 @@ String eeprom_read_dialable(int idx)
     EEPROM.get(sizeof(BookEntry) * idx, entry);
     
     if(entry.isMobile)
-    {
         result += get_dial_prefix(settings);
-    }
     
-    if(entry.num0 > 0)
-        result += String(entry.num0, DEC);
-    
-    if(entry.num1 > 0)
-        result += String(entry.num1, DEC);
-    
-    if(entry.num2 > 0)
-        result += String(entry.num2, DEC);
+    result += read_number(entry);
     
     result += ";";
     
@@ -121,14 +116,12 @@ String eeprom_read_dialable(int idx)
 }
 
 #define ASCII_BORDER 128
-#define MIN_RUSSIAN_CHAR 1025
+#define MIN_RUSSIAN_CHAR 1040
 #define MAX_RUSSIAN_CHAR 1105
+#define WIN1151_CYR 192
 
 String eeprom_read_desc(int idx)
-{
-    return String();
-
-  
+{  
     if (idx < 0 || idx >= PHONEBOOK_SIZE)
         return String();
     
@@ -150,10 +143,18 @@ String eeprom_read_desc(int idx)
         }
         else // russian: unicode 1025 ... 1105
         {
-            result += "&#";
-            result += String(MIN_RUSSIAN_CHAR + chr - ASCII_BORDER, DEC);
-            result += ";";          
-        }    
+            if(chr >= WIN1151_CYR)
+               result += "&#" + String(MIN_RUSSIAN_CHAR + chr - WIN1151_CYR, DEC) + ";";
+            else
+            {
+              switch(chr)
+              {
+                case 168: result += "Ё"; break;
+                case 184: result += "ё"; break;
+                default: result += " "; break;
+              }
+            }
+        }
     }
     
     return result;
@@ -176,66 +177,36 @@ void eeprom_write_entry(int idx, bool isMobile, String number, String desc)
     
     BookEntry entry;
     entry.isMobile = isMobile;
-    
-    String s0, s1, s2;
-    
-    if(number.length() > 0)
-        s0 = number.substring(0, max(number.length(), 9u));    
-    
-    if(number.length() > 9)
-        s1 = number.substring(9, max(number.length(), 18u));    
-    
-    if(number.length() > 18)
-        s2 = number.substring(18, max(number.length(), 27u));    
-    
-    
-    entry.num0 = s0.toInt();
-    entry.num1 = s1.toInt(); 
-    entry.num2 = s2.toInt();
-    
-    int strIdx = 0;
-    for(int i = 0; i < ENTRY_DESC_SIZE; ++i)
+
+    memset(entry.num, 0xFF, ENTRY_NUM_SIZE);
+
+    int dest_idx = 0;
+    for(int i = 0; i < number.length() && dest_idx < ENTRY_NUM_SIZE; ++i, ++dest_idx)
     {
-        char dest_chr = '\0';
-        if(strIdx < desc.length())
-        {
-            char src_chr = desc.charAt(strIdx);
-            
-            if(src_chr == '&') // russian
-            {
-                // &#1025;
-                if(strIdx + 7 > desc.length())
-                {
-                    strIdx = desc.length(); // abort parsing
-                }
-                else
-                {
-                    long i_code = desc.substring(strIdx + 2, strIdx + 6).toInt();
-                    if(i_code < MIN_RUSSIAN_CHAR || i_code > MAX_RUSSIAN_CHAR)
-                    {
-                        strIdx = desc.length(); // abort parsing    
-                    }
-                    else // ok
-                    {
-                        dest_chr = ASCII_BORDER + i_code - MIN_RUSSIAN_CHAR;
-                        strIdx += 7;
-                    }                                
-                }
-            }
-            else // latin
-            {
-                if(src_chr >= ASCII_BORDER)
-                    strIdx = desc.length(); // abort parsing
-                    else
-                    {
-                        dest_chr = src_chr; // ok
-                        strIdx++;
-                    }
-            }
-        }
-        
-        entry.desc[i] = dest_chr;
-    }    
+       char chr = number.charAt(i);
+       if(chr < '0' || chr > '9')
+          break;
+
+       uint8_t dest_chr = (chr - '0') << 4;
+       ++i;
+
+       if(i < number.length())
+       {
+          chr = number.charAt(i);
+          if(chr < '0' || chr > '9')
+            dest_chr |= 0xF;
+          else
+            dest_chr |= (chr - '0');
+       }
+       else
+       {
+           dest_chr |= 0xF;
+       }
+
+       entry.num[dest_idx] = dest_chr;
+    }
+
+    strncpy(entry.desc, desc.c_str(), ENTRY_DESC_SIZE);
     
     EEPROM.put(sizeof(BookEntry) * idx, entry);
     EEPROM.commit();    

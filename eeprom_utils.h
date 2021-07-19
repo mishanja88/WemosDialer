@@ -21,13 +21,14 @@ String get_dial_prefix(const DeviceSettings &settings);
 
 #define PHONEBOOK_SIZE 100
 
-#define ENTRY_DESC_SIZE 28
+#define ENTRY_NUM_SIZE 14
+#define ENTRY_DESC_SIZE 25
 struct BookEntry
 {
   bool isMobile : 1; 
-  uint32_t num0 : 31;
-  uint32_t num1;
-  uint32_t num2;
+  uint8_t reserve : 7;
+  
+  uint8_t num[ ENTRY_NUM_SIZE ];
 
   char desc[ ENTRY_DESC_SIZE ];
 };

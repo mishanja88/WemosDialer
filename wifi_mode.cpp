@@ -95,14 +95,14 @@ void handleRoot()
 "\n<tr>" \
 "\n <td valign='top'>" \
 "\n <h1>Добавить запись</h1>" \
-"\n <form action='/phonebook' method='POST' autocomplete='off'>" \
+"\n <form action='/phonebook' method='POST' autocomplete='off' accept-charset='windows-1251'>" \
 "\n <table class='header-item'>" \
 "\n  <tr>" \
 "\n  <td>" \
 "\n   № <input type='number' name='index' value='' placeholder='Ячейка' min='0' max='99' required style='width: 6em;'>" \
 "\n  </td>" \
 "\n  <td>" \
-"\n    <input type='text' name='desc' value='' placeholder='Описание' required style='width: 100%;' pattern='[\x00-\x7Fа-яА-ЯёЁ]{0,28}'>" \
+"\n    <input type='text' name='desc' value='' placeholder='Описание' required style='width: 100%;' pattern='[\\x00-\\x7Fа-яА-ЯёЁ]{0,28}'>" \
 "\n  </td>" \
 "\n  </tr>" \
 "\n  <tr>" \
@@ -117,26 +117,28 @@ void handleRoot()
 "\n      <div id='prefix'>+7</div>" \
 "\n     </td>" \
 "\n     <td>" \
-"\n      <input type='tel' name='phone' value='' placeholder='Телефон' required pattern='[0-9]{0,27}'>" \
+"\n      <input type='tel' name='phone' value='' placeholder='Телефон' required pattern='[0-9]{0,28}'>" \
 "\n     </td>" \
 "\n    </tr>" \
 "\n    </table>" \
 "\n </td>" \
-"\n</tr>" \
-"\n<tr>" \
+"\n </tr>" \
+"\n <tr>" \
 "\n <td align='right' colspan='2'>" \
 "\n  <input type='submit' value='Записать'>" \
 "\n </td>" \
-"\n</tr>" \
+"\n </tr>" \
 "\n</table>" \
 "\n</form>" \
-"\n</tr>" \
+"\n</tr>"));
+
+    webServer.sendContent(F("" \
 "\n<tr>" \
 "\n" \
 "\n<td valign='top'>" \
 "\n" \
 "\n<h1>Настройки</h1>" \
-"\n<form action='/settings' method='POST' autocomplete='off'>" \
+"\n<form action='/settings' method='POST' autocomplete='off' accept-charset='windows-1251'>" \
 "\n<table class='header-item'>" \
 "\n"));
 
@@ -164,8 +166,6 @@ webServer.sendContent(F("\n<tr><td colspan='2'>Яркость<br><center>" \
     webServer.sendContent(F(" step='1'> 10 " \
 "\n </center></td></tr>"));
     }
-
-
 
     webServer.sendContent(F("\n <tr>"));
     
@@ -214,7 +214,9 @@ webServer.sendContent(F("\n " \
 "\n </td>" \
 "\n <td width='100%'>" \
 "\n \n </td>" \
-"\n </tr>" \
+"\n </tr>"));
+
+webServer.sendContent(F("" \
 "\n  " \
 "\n <tr>" \
 "\n <td colspan='2'>" \
@@ -237,7 +239,7 @@ webServer.sendContent(F("\n </table>" \
 "\n  <td colspan='3'>" \
 "\n   <font size=2>© Миша, 2021</font>" \
 "\n  </td>" \
-"\n </tr>  -->" \
+"\n </tr>" \
 "\n </table>" \
 "\n </body>" \
 "\n </html>" \
@@ -281,14 +283,22 @@ void handlePhonebook()
     webServer.hasArg(PARAM_INPUT_IS_MOBILE) &&
     webServer.hasArg(PARAM_INPUT_PHONE)) 
     {
-      inputMessage += "index: ";
-      inputMessage = webServer.arg(PARAM_INPUT_NUM);
-      inputMessage += "isMobile: ";
-      inputMessage = webServer.arg(PARAM_INPUT_IS_MOBILE);
-      inputMessage += "desc: ";
-      inputMessage = webServer.arg(PARAM_INPUT_DESC);
-      inputMessage += "phone: ";
-      inputMessage = webServer.arg(PARAM_INPUT_PHONE);
+      inputMessage += "<br>index: ";
+      inputMessage += webServer.arg(PARAM_INPUT_NUM);
+      inputMessage += "<br>isMobile: ";
+      inputMessage += webServer.arg(PARAM_INPUT_IS_MOBILE);
+      inputMessage += "<br>desc: ";
+      inputMessage += webServer.arg(PARAM_INPUT_DESC);
+      inputMessage += "<br>phone: ";
+      inputMessage += webServer.arg(PARAM_INPUT_PHONE);
+
+
+      bool isMobile = (webServer.arg(PARAM_INPUT_IS_MOBILE) == String("true"));
+
+      eeprom_write_entry(webServer.arg(PARAM_INPUT_NUM).toInt(), \
+              isMobile, \
+              webServer.arg(PARAM_INPUT_PHONE), \
+              webServer.arg(PARAM_INPUT_DESC));
     }
     else {
       inputMessage = "No message sent";
@@ -296,7 +306,6 @@ void handlePhonebook()
 
     webServer.send(200, "text/html", \
 "    <head> " \
-"  <meta encoding='UTF-8'>" \
 "  <meta http-equiv='refresh' content='5; URL=/'>" \
 "  Phonebook : Данные записаны!<br>" \
  + inputMessage + \
@@ -320,13 +329,22 @@ void handleSettings()
     webServer.hasArg(PARAM_INPUT_IS_KEYSOUND)) 
     {
       inputMessage += "dialPrefix: ";
-      inputMessage = webServer.arg(PARAM_INPUT_DIALPREFIX);
+      inputMessage += webServer.arg(PARAM_INPUT_DIALPREFIX);
       inputMessage += "brightness: ";
-      inputMessage = webServer.arg(PARAM_INPUT_BRIGHTNESS);
+      inputMessage += webServer.arg(PARAM_INPUT_BRIGHTNESS);
       inputMessage += "isPulse: ";
-      inputMessage = webServer.arg(PARAM_INPUT_IS_PULSE);
+      inputMessage += webServer.arg(PARAM_INPUT_IS_PULSE);
       inputMessage += "isKeySound: ";
-      inputMessage = webServer.arg(PARAM_INPUT_IS_KEYSOUND);
+      inputMessage += webServer.arg(PARAM_INPUT_IS_KEYSOUND);
+
+      DeviceSettings val;
+      strncpy(val.dialPrefix, webServer.arg(PARAM_INPUT_DIALPREFIX).c_str(), DIAL_PREFIX_SIZE);
+      val.brightness = webServer.arg(PARAM_INPUT_BRIGHTNESS).toInt();
+      val.isSoundEnabled = (webServer.arg(PARAM_INPUT_IS_KEYSOUND) == String("true"));
+      val.isToneDial = (webServer.arg(PARAM_INPUT_IS_PULSE) == String("false"));
+      val.reserve = 0;
+      
+      eeprom_write_settings(val);
     }
     else {
       inputMessage = "No message sent";
@@ -334,7 +352,6 @@ void handleSettings()
 
     webServer.send(200, "text/html", \
 "    <head> " \
-"  <meta encoding='UTF-8'>" \
 "  <meta http-equiv='refresh' content='5; URL=/'>" \
 "  Settings : Данные записаны!<br>" \
  + inputMessage + \
@@ -355,9 +372,10 @@ void handlePort()
       inputMessage = "No message sent";
     }
 
+//"  <meta charset='UTF-8'>" \
+
     webServer.send(200, "text/html", \
 "    <head> " \
-"  <meta encoding='UTF-8'>" \
 "  <meta http-equiv='refresh' content='5; URL=/'>" \
 "  Port : Данные записаны!<br>" \
  + inputMessage + \
