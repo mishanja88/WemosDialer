@@ -1,36 +1,26 @@
 #include "wifi_mode.h"
 
 #include <DNSServer.h>
-#ifdef ESP32
-#include <WiFi.h>
-#include <AsyncTCP.h>
-#elif defined(ESP8266)
-#include <ESP8266WiFi.h>
-#include <ESPAsyncTCP.h>
-#endif
-#include "ESPAsyncWebServer.h"
+#include <ESP8266WebServer.h>
 
 #include "eeprom_utils.h"
 
 DNSServer dnsServer;
-AsyncWebServer server(80);
+AsyncWebServer webServer(80);
 
 const char *ssid = "NaborNomera";
 const char *password = NULL; // "12345678";
 
 
-class CaptiveRequestHandler : public AsyncWebHandler {
-public:
-  CaptiveRequestHandler() {}
-  virtual ~CaptiveRequestHandler() {}
+void handleRoot()
+{
+    webServer.sendHeader("Cache-Control",` "no-cache, no-store, must-revalidate");
+    webServer.sendHeader("Pragma", "no-cache");
+    webServer.sendHeader("Expires", "-1");
+    webServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
+    // here begin chunked transfer
+    webServer.send(200, "text/html", "");
 
-  bool canHandle(AsyncWebServerRequest *request){
-    //request->addInterestingHeader("ANY");
-    return true;
-  }
-
-  void handleRequest(AsyncWebServerRequest *request) {
-    AsyncResponseStream *response = request->beginResponseStream("text/html");
     
     /*response->print("<!DOCTYPE html><html><head><title>Captive Portal</title></head><body>");
     response->print("<p>This is out captive portal front page.</p>");
@@ -38,7 +28,7 @@ public:
     response->printf("<p>Try opening <a href='http://%s'>this link</a> instead</p>", WiFi.softAPIP().toString().c_str());
     response->print("</body></html>");*/
     
-    response->print(R"unicode(
+    webServer.sendContent_P(F(R"unicode(
 <html>
 <head>
 <meta charset="utf-8">
@@ -85,7 +75,7 @@ OK
 ATDT 123456789;
 OK
 </pre>
-<form action="/port.php" method="POST" autocomplete="off">
+<form action="/port" method="POST" autocomplete="off">
 <table class='header-item'>
 <tr>
 <td width='100%'>
@@ -112,7 +102,7 @@ OK
    № <input type="number" name="index" value="" placeholder="Ячейка" min="0" max="99" required style='width: 6em;'>
  </td>
  <td>
-    <input type="text" name="text" value="" placeholder="Описание" required style='width: 100%;' pattern='[0-9a-zA-Zа-яА-Я \-.,]{0,20}'>
+    <input type="text" name="desc" value="" placeholder="Описание" required style='width: 100%;' pattern='[0-9a-zA-Zа-яА-Я \-.,]{0,20}'>
  </td>
 <tr>
  <td>
@@ -126,7 +116,7 @@ OK
       <div id='prefix'>+7</div>
      </td>
      <td>
-      <input type="tel" name="tel" value="" placeholder="Телефон" required pattern='[0-9]{0,20}'>
+      <input type="tel" name="phone" value="" placeholder="Телефон" required pattern='[0-9]{0,20}'>
      </td>
     <tr>
     </table>
@@ -148,83 +138,83 @@ OK
 <h1>Настройки</h1>
 <form action="/settings" method="POST" autocomplete="off">
 <table class='header-item'>
-)unicode");
+)unicode"));
     
     DeviceSettings settings = eeprom_read_settings();
     
     {
-response->print(R"unicode(     
+webServer.sendContent_P(F(R"unicode(     
 <tr>
  <td colspan='2'>
    Префикс выхода на мобильную связь<br>
-   <input type="text" name="mobilePrefix" value="   
-)unicode");
+   <input type="text" name="dialPrefix" value="   
+)unicode"));
 
-    response->print(String(settings.dialPrefix, DIAL_PREFIX_SIZE));
+    webServer.sendContent(get_dial_prefix(settings));
 
-    response->print(R"unicode(   
+    webServer.sendContent_P(F(R"unicode(   
 " required style='width: 100%;' pattern='[0-9W,]+'>
    </td>
 </tr>
-)unicode");
+)unicode"));
     }
         
     {
-response->print(R"unicode(     
+webServer.sendContent_P(F(R"unicode(     
 <tr>
  <td colspan='2'>
   Яркость<br>
-  <center>0<input type="range" name="brightness" min="0" max="10" value=")unicode");
+  <center>0<input type="range" name="brightness" min="0" max="10" value=")unicode"));
 
-    response->print(String(settings.brightness, DEC));
+    webServer.sendContent(String(settings.brightness, DEC));
 
-    response->print(R"unicode(" step="1">10</center>
+    webServer.sendContent_P(F(R"unicode(" step="1">10</center>
  </td>
 </tr> 
-)unicode");
+)unicode"));
     }
 
-    response->print("<tr>");
+    webServer.sendContent_P(F("<tr>"));
     
     {
-        response->print(R"unicode( <td>
+        webServer.sendContent_P(F(R"unicode( <td>
    Метод набора<br>
-   <input name="isPulse" type="radio" value="true" )unicode");
+   <input name="isPulse" type="radio" value="true" )unicode"));
 
         if(!settings.isToneDial)
-            response->print("checked");
+            webServer.sendContent_P(F("checked"));
 
-        response->print(R"unicode(>Импульсный<br>
-   <input name="isPulse" type="radio" value="false" )unicode");
+        webServer.sendContent_P(F(R"unicode(>Импульсный<br>
+   <input name="isPulse" type="radio" value="false" )unicode"));
 
         if(settings.isToneDial)
-            response->print("checked");
+            webServer.sendContent_P(F("checked"));
 
-        response->print(R"unicode(>Тоновый<br>
+        webServer.sendContent_P(F(R"unicode(>Тоновый<br>
  </td>
-)unicode");
+)unicode"));
     }
 
     {
-        response->print(R"unicode( <td>
+        webServer.sendContent_P(F(R"unicode( <td>
    Звук нажатия клавиш<br>
-   <input name="isKeySound" type="radio" value="true" )unicode");
+   <input name="isKeySound" type="radio" value="true" )unicode"));
 
         if(settings.isSoundEnabled)
-            response->print("checked");
+            webServer.sendContent_P(F("checked"));
 
-        response->print(R"unicode(>Вкл<br>
-   <input name="isKeySound" type="radio" value="false" )unicode");
+        webServer.sendContent_P(F(R"unicode(>Вкл<br>
+   <input name="isKeySound" type="radio" value="false" )unicode"));
 
         if(!settings.isSoundEnabled)
-            response->print("checked");
+            webServer.sendContent_P(F("checked"));
 
-        response->print(R"unicode(>Выкл<br>
+        webServer.sendContent_P(F(R"unicode(>Выкл<br>
  </td>
-)unicode");
+)unicode"));
     }
     
-response->print(R"unicode( 
+webServer.sendContent_P(F(R"unicode( 
 </tr>
 <tr>
  <td colspan='1'>
@@ -246,18 +236,16 @@ response->print(R"unicode(
 <h1>Телефонная книга</h1>
 
 <table border='1' cellspacing='2' cellpadding='5'>
-)unicode");
+)unicode"));
 
     for(int idx = 0; idx < PHONEBOOK_SIZE; ++idx)
     {
-        response->printf("<tr><td align='center'>%d</td>", idx);
-        response->printf("<td>%s</td>", eeprom_read_printable(idx));
-        response->printf("<td>%s</td>", eeprom_read_dialable(idx));
-        response->printf("<td>%s</td>", eeprom_read_desc(idx));
-        response->print("</tr>\n");
+        char buff[500];
+        sprintf(buff, "<tr><td align='center'>%d</td><td>%s</td><td>%s</td><td>%s</td></tr>\n", idx, eeprom_read_printable(idx), eeprom_read_dialable(idx), eeprom_read_desc(idx));
+        webServer.sendContent(buff);
     }
 
-response->print(R"unicode(
+webServer.sendContent_P(F(R"unicode(
  </table>
  </td>
 </tr>
@@ -269,64 +257,141 @@ response->print(R"unicode(
 </table>
 </body>
 </html>
-)unicode");
+)unicode"));
 
-    request->send(response);
-  }
-};
+    webServer.sendContent(F("")); // this tells web client that transfer is done
+    webServer.client().stop();
+}
 
-void notFound(AsyncWebServerRequest *request) {
-    request->send(404, "text/plain", "Not found");
+
+void handleNotFound() 
+{
+    String message = "File Not Found\n\n";
+    message += "URI: ";
+    message += server.uri();
+    message += "\nMethod: ";
+    message += ( server.method() == HTTP_GET ) ? "GET" : "POST";
+    message += "\nArguments: ";
+    message += server.args();
+    message += "\n";
+
+    for ( uint8_t i = 0; i < server.args(); i++ ) {
+        message += " " + server.argName ( i ) + ": " + server.arg ( i ) + "\n";
+    }
+
+    webServer.send ( 404, "text/plain", message );
+}
+
+void handlePhonebook()
+{
+    String inputMessage;
+
+    if (webServer.hasArg("index") &&
+    webServer.hasArg("isMobile") &&
+    webServer.hasArg("desc") &&
+    webServer.hasArg("phone")) 
+    {
+      inputMessage += "index: ";
+      inputMessage = webServer.arg("index");
+      inputMessage += "isMobile: ";
+      inputMessage = webServer.arg("isMobile");
+      inputMessage += "desc: ";
+      inputMessage = webServer.arg("desc");
+      inputMessage += "phone: ";
+      inputMessage = webServer.arg("phone");
+    }
+    else {
+      inputMessage = "No message sent";
+    }
+
+    request->send(200, "text/html", R"rawliteral(
+    <head>
+  <meta encoding='UTF-8'>
+  <meta http-equiv='refresh' content='5; URL=/'>
+  Phonebook : Данные записаны!<br>
+)rawliteral" + inputMessage +
+R"rawliteral(
+</head>
+)rawliteral");    
+}
+
+void handleSettings()
+{
+    String inputMessage;
+
+    if (webServer.hasArg("dialPrefix") &&
+    webServer.hasArg("brightness") &&
+    webServer.hasArg("isPulse") &&
+    webServer.hasArg("isKeySound")) 
+    {
+      inputMessage += "dialPrefix: ";
+      inputMessage = webServer.arg("dialPrefix");
+      inputMessage += "brightness: ";
+      inputMessage = webServer.arg("brightness");
+      inputMessage += "isPulse: ";
+      inputMessage = webServer.arg("isPulse");
+      inputMessage += "isKeySound: ";
+      inputMessage = webServer.arg("isKeySound");
+    }
+    else {
+      inputMessage = "No message sent";
+    }
+
+    request->send(200, "text/html", R"rawliteral(
+    <head>
+  <meta encoding='UTF-8'>
+  <meta http-equiv='refresh' content='5; URL=/'>
+  Settings : Данные записаны!<br>
+)rawliteral" + inputMessage +
+R"rawliteral(
+</head>
+)rawliteral");
+}
+
+void handlePort()
+{
+    String inputMessage;
+
+    if (webServer.hasArg("text"))
+    {
+      inputMessage += "text: ";
+      inputMessage = webServer.arg("text");
+    }
+    else {
+      inputMessage = "No message sent";
+    }
+
+    request->send(200, "text/html", R"rawliteral(
+    <head>
+  <meta encoding='UTF-8'>
+  <meta http-equiv='refresh' content='5; URL=/'>
+  Port : Данные записаны!<br>
+)rawliteral" + inputMessage +
+R"rawliteral(
+</head>
+)rawliteral");
 }
 
 void wifi_setup(){
   //your other setup stuff...
   WiFi.softAP(ssid);
   dnsServer.start(53, "*", WiFi.softAPIP());
-  server.addHandler(new CaptiveRequestHandler()); //.setFilter(ON_AP_FILTER);//only when requested from AP
+  //server.addHandler(new CaptiveRequestHandler()); //.setFilter(ON_AP_FILTER);//only when requested from AP
   //more handlers...
   
-  /* Send web page with input fields to client
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-    String result = String(index_html_head) + getTable() + String(index_html_tail);
-    request->send(200, "text/html", result);
-  });*/
-
-  // Send a GET request to <ESP_IP>/get?input1=<inputMessage>
-  server.on("/get", HTTP_GET, [] (AsyncWebServerRequest *request) {
-    String inputMessage;
-    // GET input1 value on <ESP_IP>/get?input1=<inputMessage>
-    if (request->hasParam(PARAM_INPUT_NUM) &&
-    request->hasParam(PARAM_INPUT_PHONE) &&
-    request->hasParam(PARAM_INPUT_DESC)) 
-    {
-      inputMessage += "num: ";
-      inputMessage = request->getParam(PARAM_INPUT_NUM)->value();
-      inputMessage += "phone: ";
-      inputMessage = request->getParam(PARAM_INPUT_PHONE)->value();
-      inputMessage += "desc: ";
-      inputMessage = request->getParam(PARAM_INPUT_DESC)->value();
-    }
-    else {
-      inputMessage = "No message sent";
-    }
-    // Serial.println(inputMessage);
-    request->send(200, "text/html", R"rawliteral(
-    <head>
-  <meta http-equiv='refresh' content='2; URL=/'>
-  Данные записаны!<br>
-)rawliteral" + inputMessage +
-R"rawliteral(
-</head>
-)rawliteral");
-  });
-  server.onNotFound(notFound);
-  
-  server.begin();
+    webServer.on("/", handleRoot);
+    
+    webServer.on("/phonebook", handlePhonebook);
+    webServer.on("/settings", handleSettings);
+    webServer.on("/port", handlePort);
+    
+    webServer.onNotFound ( handleNotFound );
+    webServer.begin();
 }
 
 void wifi_loop(){
-  dnsServer.processNextRequest();
+    dnsServer.processNextRequest();
+    webServer.handleClient();
 }
 
 /*
