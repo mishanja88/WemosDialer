@@ -35,6 +35,8 @@ void set_state(State next)
 }
 
 void setup() {
+  Serial.begin(9600);
+  
   led_init();
   g_is_wifi_mode = wifi_is_enabled();
   EEPROM.begin(4096);  //Initialize EEPROM

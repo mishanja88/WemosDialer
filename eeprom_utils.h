@@ -17,6 +17,8 @@ struct DeviceSettings
    char dialPrefix[ DIAL_PREFIX_SIZE ];
 };
 
+String get_dial_prefix(const DeviceSettings &settings);
+
 #define PHONEBOOK_SIZE 100
 
 #define ENTRY_DESC_SIZE 28
@@ -46,4 +48,4 @@ String eeprom_read_desc(int idx);
 void eeprom_write_entry(int idx, bool isMobile, String number, String desc);
 
 
-#endif __EEPROM_UTILS_H
+#endif // __EEPROM_UTILS_H

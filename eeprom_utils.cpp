@@ -6,12 +6,15 @@
 DeviceSettings eeprom_read_settings()
 {
     DeviceSettings result;
+    memset(&result, 0, sizeof(DeviceSettings));
+    return result;
+    
     EEPROM.get(SETTINGS_OFFSET, result);
     
     if(result.brightness > 10)
         result.brightness = 10;
     
-    for(i = 0; i < DIAL_PREFIX_SIZE; ++i)
+    for(int i = 0; i < DIAL_PREFIX_SIZE; ++i)
     {
         switch(result.dialPrefix[i])
         {
@@ -30,7 +33,7 @@ DeviceSettings eeprom_read_settings()
                 continue;
                 
             default:
-                dialPrefix[i] = '\0';
+                result.dialPrefix[i] = '\0';
         }
         
         break;
@@ -49,6 +52,8 @@ void eeprom_write_settings(DeviceSettings val)
 
 String eeprom_read_printable(int idx)
 {
+    return String();
+  
     if (idx < 0 || idx >= PHONEBOOK_SIZE)
         return String();
     
@@ -75,6 +80,9 @@ String eeprom_read_printable(int idx)
 
 String eeprom_read_dialable(int idx)
 {
+    return String();
+
+  
     if (idx < 0 || idx >= PHONEBOOK_SIZE)
         return String();
     
@@ -93,10 +101,9 @@ String eeprom_read_dialable(int idx)
     BookEntry entry;
     EEPROM.get(sizeof(BookEntry) * idx, entry);
     
-    String result;
     if(entry.isMobile)
     {
-        result += String((const char *) settings.dialPrefix, DIAL_PREFIX_SIZE);
+        result += get_dial_prefix(settings);
     }
     
     if(entry.num0 > 0)
@@ -119,6 +126,9 @@ String eeprom_read_dialable(int idx)
 
 String eeprom_read_desc(int idx)
 {
+    return String();
+
+  
     if (idx < 0 || idx >= PHONEBOOK_SIZE)
         return String();
     
@@ -126,6 +136,7 @@ String eeprom_read_desc(int idx)
     EEPROM.get(sizeof(BookEntry) * idx, entry);
     
     String result;
+    result.reserve(ENTRY_DESC_SIZE);
     
     for(int i = 0; i < ENTRY_DESC_SIZE; ++i)
     {
@@ -148,6 +159,15 @@ String eeprom_read_desc(int idx)
     return result;
 }
 
+String get_dial_prefix(const DeviceSettings &settings)
+{
+  char *str = new char[DIAL_PREFIX_SIZE + 1];
+  memset(str, 0, DIAL_PREFIX_SIZE + 1);
+  memcpy(str, settings.dialPrefix, DIAL_PREFIX_SIZE);
+  String result(str);
+  delete [] str;
+  return result;
+}
 
 void eeprom_write_entry(int idx, bool isMobile, String number, String desc)
 {
@@ -160,13 +180,13 @@ void eeprom_write_entry(int idx, bool isMobile, String number, String desc)
     String s0, s1, s2;
     
     if(number.length() > 0)
-        s0 = number.substring(0, max(number.length(), 9));    
+        s0 = number.substring(0, max(number.length(), 9u));    
     
     if(number.length() > 9)
-        s1 = number.substring(9, max(number.length(), 18));    
+        s1 = number.substring(9, max(number.length(), 18u));    
     
     if(number.length() > 18)
-        s2 = number.substring(18, max(number.length(), 27));    
+        s2 = number.substring(18, max(number.length(), 27u));    
     
     
     entry.num0 = s0.toInt();
@@ -179,7 +199,7 @@ void eeprom_write_entry(int idx, bool isMobile, String number, String desc)
         char dest_chr = '\0';
         if(strIdx < desc.length())
         {
-            char src_chr = charAt(strIdx);
+            char src_chr = desc.charAt(strIdx);
             
             if(src_chr == '&') // russian
             {
