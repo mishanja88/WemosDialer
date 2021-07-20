@@ -5,6 +5,7 @@
 #include "wifi_mode.h"
 #include "sound_beep.h"
 #include "led_display.h"
+#include "port.h"
 #include "i2c_keypad.h"
 
 #define I2C_KEYPAD_ADDRESS 0x20
@@ -35,7 +36,7 @@ void set_state(State next)
 }
 
 void setup() {
-  Serial.begin(9600);
+  port_init();
   
   led_init();
   g_is_wifi_mode = wifi_is_enabled();

@@ -2,7 +2,7 @@
 
 #include <DNSServer.h>
 #include <ESP8266WebServer.h>
-
+#include "port.h"
 #include "eeprom_utils.h"
 
 DNSServer dnsServer;
@@ -14,6 +14,10 @@ const char *password = NULL; // "12345678";
 
 void handleRoot()
 {
+    unsigned long time = millis();
+    while(millis() - time < 5000)
+       port_update_buffer();
+  
     webServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     webServer.sendHeader("Pragma", "no-cache");
     webServer.sendHeader("Expires", "-1");
@@ -69,13 +73,11 @@ void handleRoot()
 "\n<tr>" \
 "\n <td>" \
 "\n <h1>Отладка порта RS232</h1>" \
-"\n <pre>" \
-"\nAT" \
-"\nOK" \
-"\nATDT 123456789;" \
-"\nOK" \
-"\n </pre>" \
-"\n <form action='/port' method='POST' autocomplete='off'>" \
+"\n "));
+
+webServer.sendContent("<pre>" + port_get_buffer() + "</pre>");
+
+webServer.sendContent(F("\n <form action='/port' method='POST' autocomplete='off' accept-charset='windows-1251'>" \
 "\n <table class='header-item'>" \
 "\n  <tr>" \
 "\n  <td width='100%'>" \
@@ -306,8 +308,9 @@ void handlePhonebook()
 
     webServer.send(200, "text/html", \
 "    <head> " \
-"  <meta http-equiv='refresh' content='5; URL=/'>" \
-"  Phonebook : Данные записаны!<br>" \
+"    <meta charset='windows-1251'>" \
+"  <meta http-equiv='refresh' content='3; URL=/'>" \
+"  Phonebook : OK!<br>" \
  + inputMessage + \
 "</head>" \
 );    
@@ -352,21 +355,26 @@ void handleSettings()
 
     webServer.send(200, "text/html", \
 "    <head> " \
-"  <meta http-equiv='refresh' content='5; URL=/'>" \
-"  Settings : Данные записаны!<br>" \
+"    <meta charset='windows-1251'>" \
+"  <meta http-equiv='refresh' content='3; URL=/'>" \
+"  Settings : OK!<br>" \
  + inputMessage + \
 "</head>" \
 );    
 }
 
+const char* PARAM_INPUT_TEXT = "text";
+
 void handlePort()
 {
     String inputMessage;
 
-    if (webServer.hasArg("text"))
+    if (webServer.hasArg(PARAM_INPUT_TEXT))
     {
       inputMessage += "text: ";
-      inputMessage = webServer.arg("text");
+      inputMessage = webServer.arg(PARAM_INPUT_TEXT);
+
+      port_send(webServer.arg(PARAM_INPUT_TEXT));
     }
     else {
       inputMessage = "No message sent";
@@ -376,8 +384,9 @@ void handlePort()
 
     webServer.send(200, "text/html", \
 "    <head> " \
-"  <meta http-equiv='refresh' content='5; URL=/'>" \
-"  Port : Данные записаны!<br>" \
+"    <meta charset='windows-1251'>" \
+"  <meta http-equiv='refresh' content='3; URL=/'>" \
+"  Port : OK!<br>" \
  + inputMessage + \
 "</head>" \
 );    
