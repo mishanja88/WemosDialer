@@ -13,11 +13,7 @@ const char *password = NULL; // "12345678";
 
 
 void handleRoot()
-{
-    unsigned long time = millis();
-    while(millis() - time < 5000)
-       port_update_buffer();
-  
+{  
     webServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     webServer.sendHeader("Pragma", "no-cache");
     webServer.sendHeader("Expires", "-1");
@@ -75,7 +71,7 @@ void handleRoot()
 "\n <h1>Отладка порта RS232</h1>" \
 "\n "));
 
-webServer.sendContent("<pre>" + port_get_buffer() + "</pre>");
+webServer.sendContent(String("<pre>") + port_get_buffer() + String("</pre>"));
 
 webServer.sendContent(F("\n <form action='/port' method='POST' autocomplete='off' accept-charset='windows-1251'>" \
 "\n <table class='header-item'>" \
@@ -392,24 +388,37 @@ void handlePort()
 );    
 }
 
-void wifi_setup(){
-  //your other setup stuff...
-  WiFi.softAP(ssid);
-  dnsServer.start(53, "*", WiFi.softAPIP());
-  //server.addHandler(new CaptiveRequestHandler()); //.setFilter(ON_AP_FILTER);//only when requested from AP
-  //more handlers...
+void wifi_setup()
+{
+    WiFi.hostname("nn");
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP(ssid, password);
+  
+    delay(100);
+  
+    IPAddress apIP(8, 8, 8, 8);
+    WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
 
+    dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
+    dnsServer.start(53, "*", WiFi.softAPIP());
+  
     webServer.on("/", handleRoot);
+    webServer.on("/generate_204", handleRoot); //Android captive portal
+    webServer.on("/fwlink", handleRoot); //Microsoft captive portal
+    webServer.on("/favicon.ico", handleRoot); //Another captive portal
+    
     
     webServer.on("/phonebook", handlePhonebook);
     webServer.on("/settings", handleSettings);
     webServer.on("/port", handlePort);
     
+    
     webServer.onNotFound ( handleNotFound );
     webServer.begin();
 }
 
-void wifi_loop(){
+void wifi_loop()
+{
     dnsServer.processNextRequest();
     webServer.handleClient();
 }

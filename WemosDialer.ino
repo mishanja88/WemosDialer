@@ -35,7 +35,8 @@ void set_state(State next)
   g_state_millis = millis();
 }
 
-void setup() {
+void setup() 
+{
   port_init();
   
   led_init();
@@ -61,11 +62,12 @@ void setup() {
   Wire.beginTransmission(I2C_KEYPAD_ADDRESS);
   if (Wire.endTransmission() != 0)
   {
-    led_print( FNT_ERR, FNT_0 );
-
     while (1)
     {
-      sound_beep(SB_MODE_FAILURE);
+        led_print(FNT_ERR, (Font) 0);
+        sound_beep(SB_MODE_FAILURE);
+        led_print(FNT_SPACE, FNT_SPACE);
+        delay(200);
     }
   }
 
@@ -93,6 +95,8 @@ char pStrNum = '0';
 
 void loop()
 {
+  port_update_buffer(200);
+  
   if (g_is_wifi_mode)
   {
     wifi_loop();
@@ -164,48 +168,27 @@ void loop()
     case S_DIAL:
     {
         sound_beep( SB_DIAL );
+        
+        int idx = 0;
+        for(int i = 0; i < g_digit_index; ++i)
+        {
+            idx = 10*idx + g_digits[i];
+        }
+        
+        int retCode = port_dial(idx);
+        if(retCode != 0)
+        {            
+            for(int i = 0; i < 5; ++i)
+            {
+                led_print(FNT_ERR, (Font) retCode);
+                sound_beep(SB_MODE_FAILURE);
+                led_print(FNT_SPACE, FNT_SPACE);
+                delay(200);
+            }
+        }
+        
         set_state(S_INIT);
     }
     break;
   }
-/*
-  char key = keyPad.get_key();
-
-  if (key != last_key)
-  {
-    last_key = key;
-
-    if (key != '\0')
-    {
-      tone(D4, 4000, 100);
-      tone(D4, 8000, 100);
-      if (key == 'Y' || key == 'N')
-        key = FNT_DOT;
-      else
-        key -= '0';
-      // drawString(&key, 1, x, 0);
-      // lmd.display();
-      led_print( (Font) key, FNT_DOT);
-    }
-  }
-
-*/
-  /*
-
-    // Draw the text to the current position
-    int len = strlen(text);
-    drawString(text, len, x, 0);
-    // In case you wonder why we don't have to call lmd.clear() in every loop: The font has a opaque (black) background...
-
-    // Toggle display of the new framebuffer
-    lmd.display();
-
-    // Wait to let the human read the display
-    delay(ANIM_DELAY);
-
-    // Advance to next coordinate
-    if( --x < len * -8 ) {
-      x = LEDMATRIX_WIDTH;
-    }
-  */
 }

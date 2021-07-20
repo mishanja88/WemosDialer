@@ -3,12 +3,18 @@
 
 #include <Arduino.h>
 
-String port_get_buffer();
+char* port_get_buffer();
 
-void port_update_buffer();
+int  port_get_buffer_length();
+
+void port_clear_buffer();
+
+void port_update_buffer(unsigned long timeout);
 
 void port_send(String data);
 
 void port_init();
+
+int port_dial(int idx);
 
 #endif // __PORT_H
