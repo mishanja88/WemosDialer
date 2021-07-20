@@ -95,8 +95,6 @@ char pStrNum = '0';
 
 void loop()
 {
-  port_update_buffer(200);
-  
   if (g_is_wifi_mode)
   {
     wifi_loop();

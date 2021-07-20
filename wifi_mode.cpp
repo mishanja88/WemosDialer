@@ -421,6 +421,8 @@ void wifi_loop()
 {
     dnsServer.processNextRequest();
     webServer.handleClient();
+
+    port_update_buffer(200);
 }
 
 /*
