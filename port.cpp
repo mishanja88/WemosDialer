@@ -71,15 +71,8 @@ void port_init()
   port_clear_buffer();
 }
 
-DialerErrno port_send_accepted(String cmd, unsigned long timeout)
+DialerErrno port_check_accepted()
 {
-  port_clear_buffer();
-  port_send(cmd);
-
-  for(unsigned long t = 0; t < timeout / 100; ++t)
-  {
-    port_update_buffer(100);
-
     const char *failCodes[] =
     {
        "NO CARRIER",
@@ -91,14 +84,33 @@ DialerErrno port_send_accepted(String cmd, unsigned long timeout)
 
     for(int i = 0; failCodes[i] != NULL; ++i)
       if(strstr(g_portBuffer, failCodes[i]) != NULL)
-         return (DialerErrno)(ERR_MODEM_NO_CARRIER + i);
+         return (DialerErrno)(ERR_MODEM_NO_DIALTONE + i);
          
     if(strstr(g_portBuffer, "OK") != NULL)
        return ERR_NONE;
+
+   return ERR_MODEM_TIMEOUT;
+}
+
+
+DialerErrno port_send_accepted(String cmd, unsigned long timeout)
+{
+  port_clear_buffer();
+  port_send(cmd);
+
+  for(unsigned long t = 0; t < timeout / 100; ++t)
+  {
+    port_update_buffer(100);
+    DialerErrno retCode = port_check_accepted();
+    if(retCode != ERR_MODEM_TIMEOUT)
+       return retCode;
   }
 
-  return ERR_NONE;
+// return ERR_NONE;
+  return ERR_MODEM_TIMEOUT;
 }
+
+
 
 int port_dial(int idx)
 {

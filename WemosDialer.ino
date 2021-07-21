@@ -41,71 +41,148 @@ void set_state(State next)
 #define ITER_COUNT_INIT 3
 #define ITER_ATD_IDX 3
 
+unsigned long get_dial_time(const char *cmd)
+{
+  bool isPulse = false;
+  unsigned long result;
+  while (*cmd != '\0')
+  {
+    if (*cmd >= '0' && *cmd <= '9')
+    {
+      if (isPulse)
+      {
+        if (*cmd == '0')
+          result +=           10 * 300ul + 500ul;
+        else
+          result += (*cmd - '0') * 300ul + 500ul;
+      }
+      else
+      {
+        result += 800ul;
+      }
+    }
+    else
+    {
+      switch (*cmd)
+      {
+        case 'P': isPulse = true; break;
+        case 'T': isPulse = false; break;
+        case 'W': result += 6000ul; break;
+        case ',': result += 2500ul; break;
+        default: break;
+      }
+    }
+    cmd++;
+  }
+  return result;
+}
+
 DialerErrno dial_iterations(int iterCount, int idx = 0)
 {
-    DialerErrno retCode = ERR_NONE;
-    
-    const char *cmd[ ITER_COUNT_DIAL ] = {
-        "AT", "ATM0", "ATH", "ATD...", "ATH"
-    };
-    
-    for(int iter = 0; iter < iterCount; ++iter)
-    {
-        if(iter == ITER_ATD_IDX)
-        {
-            String dialCmd = eeprom_read_dialable(idx);
-            retCode = port_send_accepted(dialCmd, 10000ul * (unsigned long)dialCmd.length());
-            
-            if (retCode == ERR_NONE)
-            {
-                bool needDelay = true;
-                for(int blinkCnt = 0; needDelay && blinkCnt < 10; ++blinkCnt)
-                {
-                    if(blinkCnt & 1)
-                        led_print( FNT_SPACE, FNT_SPACE);
-                    else
-                        led_print( g_digits[0], g_digits[1]);
-                    
-                    for(int pollCnt = 0; needDelay && pollCnt < 10; ++pollCnt)
-                    {
-                        port_update_buffer(100ul);
-                        
-                        char key = keyPad.get_key();
-                        if (key == last_key)
-                            continue;
-                
-                        last_key = key;
+  DialerErrno retCode = ERR_NONE;
 
-                        if(key == '\0')
-                            continue;
-                        
-                        sound_beep( SB_CANCEL );
-                        needDelay = false;
-                    }
-                }
-            }
+  const char *cmd[ ITER_COUNT_DIAL ] = {
+    "AT", "ATM0", "ATH", "ATD...", "ATH"
+  };
+
+  for (int iter = 0; iter < iterCount; ++iter)
+  {
+    if (iter == ITER_ATD_IDX)
+    {
+      String dialCmd = eeprom_read_dialable(idx);
+      port_send(dialCmd);
+      unsigned long delayTime = 5000ul + get_dial_time(dialCmd.c_str());
+      unsigned long beginTime = millis();
+
+      bool isBlink = false;
+
+      bool isExtraDelay = false;
+      while (true)
+      {
+        unsigned long now = millis();
+        bool nextBlink = ((now / 500) & 1);
+        if (isBlink != nextBlink)
+        {
+          if (isExtraDelay)
+            led_print( FNT_SPACE, FNT_SPACE);
+          else
+            led_print( FNT_DOT, FNT_DOT);
+        }
+        else
+          led_print( g_digits[0], g_digits[1]);
+
+        isBlink = nextBlink;
+
+        port_update_buffer(100ul);
+
+        retCode = port_check_accepted();
+
+        if (retCode == ERR_NONE) // got OK, now extra delay
+        {
+          if (!isExtraDelay)
+          {
+            beginTime = now;
+            isExtraDelay = true;
+          }
         }
         else
         {
-            retCode = port_send_accepted(cmd[iter], 3000ul);
+          if (isExtraDelay || retCode != ERR_MODEM_TIMEOUT)
+            break;  // got error in extra delay mode
         }
-    
-        if (retCode != ERR_NONE)
+
+        if (now - beginTime > delayTime)
         {
-            break;
+          if(!isExtraDelay)
+            retCode = ERR_MODEM_TIMEOUT;
+            
+          break;
         }
+
+        char key = keyPad.get_key();
+        if (key == last_key)
+          continue;
+
+        last_key = key;
+
+        if (key != '\0') // any key cancels the call
+        {
+           sound_beep( SB_CANCEL );
+           retCode = ERR_NONE;
+           break;
+        }
+      }
     }
-    
-    return retCode;
+    else
+    {
+      retCode = port_send_accepted(cmd[iter], 3000ul);
+    }
+
+    if (retCode != ERR_NONE)
+    {
+      break;
+    }
+  }
+
+  return retCode;
+}
+
+void show_errcode(DialerErrno errCode)
+{
+  led_print_err(errCode);
+  sound_beep(SB_MODE_FAILURE);
+  delay(2000);
+  led_print(FNT_SPACE, FNT_SPACE);
+  delay(200);
 }
 
 
-void setup() 
+void setup()
 {
   EEPROM.begin(4096);  //Initialize EEPROM
-  
-  sound_init();  
-  port_init();  
+
+  sound_init();
+  port_init();
   led_init();
 
   Wire.begin();
@@ -115,32 +192,24 @@ void setup()
   if (Wire.endTransmission() != 0) // keypad check
   {
     while (1) // severe failure, need endless loop
-    {
-        led_print_err(ERR_KEYBOARD_TIMEOUT);
-        sound_beep(SB_MODE_FAILURE);
-        led_print(FNT_SPACE, FNT_SPACE);
-        delay(200);
-    }
+      show_errcode(ERR_KEYBOARD_TIMEOUT);
   }
 
   keyPad.init();
   last_key = keyPad.get_key();
-  
+
   g_is_wifi_mode = wifi_is_enabled();
-  
-  if(! g_is_wifi_mode)
+
+  if (! g_is_wifi_mode)
   {
     // Port check in work mode. It's possible to connect modem and pass it
     DialerErrno errCode;
-    while(ERR_NONE != (errCode = dial_iterations(ITER_COUNT_INIT)))
+    while (ERR_NONE != (errCode = dial_iterations(ITER_COUNT_INIT)))
     {
-        led_print_err(errCode);
-        sound_beep(SB_MODE_FAILURE);
-        led_print(FNT_SPACE, FNT_SPACE);
-        delay(200);      
+      show_errcode(errCode);
     }
   }
-  
+
   if (g_is_wifi_mode)
   {
     wifi_setup();
@@ -180,7 +249,7 @@ void loop()
     return;
   }
 
-  // inactivity timer  
+  // inactivity timer
   uint32_t now = millis();
   if (now - g_state_millis > 30000ul)
     set_state(S_INIT);
@@ -211,13 +280,13 @@ void loop()
 
         char key = keyPad.get_key();
         if (key == last_key)
-           return;
-  
+          return;
+
         last_key = key;
 
-        if(key == '\0')
-           return;
-        
+        if (key == '\0')
+          return;
+
         if (key == 'N' || // cancel by user
             //abs(millis() - g_state_time) > STATE_TIMEOUT_MILLIS || // cancel by timeout
             (key == 'Y' && g_digit_index == 0) ||  // dial, but no digits entered
@@ -245,36 +314,31 @@ void loop()
       break;
 
     case S_DIAL:
-    {
-        if(g_digit_index == 1)
+      {
+        if (g_digit_index == 1)
         {
-            g_digits[1] = FNT_SPACE;
-            led_print( g_digits[0], g_digits[1]);
+          g_digits[1] = FNT_SPACE;
+          led_print( g_digits[0], g_digits[1]);
         }
-        
+
         sound_beep( SB_DIAL );
-        
+
         int idx = 0;
-        for(int i = 0; i < g_digit_index; ++i)
+        for (int i = 0; i < g_digit_index; ++i)
         {
-            idx = 10*idx + g_digits[i];
+          idx = 10 * idx + g_digits[i];
         }
-        
-        DialerErrno retCode = dial_iterations(ITER_COUNT_DIAL, idx);        
-        
-        if(retCode != 0)
-        {            
-            for(int i = 0; i < 3; ++i)
-            {
-                led_print_err(retCode);
-                sound_beep(SB_MODE_FAILURE);
-                led_print(FNT_SPACE, FNT_SPACE);
-                delay(200);
-            }
+
+        DialerErrno errCode = dial_iterations(ITER_COUNT_DIAL, idx);
+
+        if (errCode != 0)
+        {
+          for (int i = 0; i < 3; ++i)
+            show_errcode(errCode);
         }
-        
+
         set_state(S_INIT);
-    }
-    break;
+      }
+      break;
   }
 }

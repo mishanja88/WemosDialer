@@ -9,7 +9,7 @@ void sound_init()
 
 void sound_beep(SoundBeep mode)
 {
-  if(mode != SB_MODE_WIFI && mode != SB_MODE_WORK)
+  if(mode != SB_MODE_WIFI && mode != SB_MODE_WORK && mode != SB_MODE_FAILURE)
   {
       DeviceSettings settings = eeprom_read_settings();
       if(!settings.isSoundEnabled)
@@ -42,9 +42,8 @@ void sound_beep(SoundBeep mode)
     case SB_MODE_FAILURE:
       {
         tone(D4, 8000, 150);
-        delay(150);
+        delay(400);
         tone(D4, 8000, 150);
-        delay(10000);
       }
       break;
 
