@@ -325,6 +325,11 @@ void led_print(Font left, Font right)
   lmd.display();
 }
 
+void led_print_err(DialerErrno err)
+{
+  led_print(FNT_ERR, (Font) err);
+}
+
 void led_init()
 {
   // init the display

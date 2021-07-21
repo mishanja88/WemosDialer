@@ -227,7 +227,11 @@ webServer.sendContent(F("" \
     for(int idx = 0; idx < PHONEBOOK_SIZE; ++idx)
     {
         char buff[500];
-        sprintf(buff, "\n <tr><td align='center'>%d</td><td>%s</td><td>%s</td><td>%s</td></tr>\n", idx, eeprom_read_printable(idx).c_str(), eeprom_read_dialable(idx).c_str(), eeprom_read_desc(idx).c_str());
+        sprintf(buff, "\n <tr><td align='center'>%d</td><td>%s</td><td>%s</td></tr>\n",
+                    idx, 
+                    eeprom_read_printable(idx).c_str(), // eeprom_read_dialable(idx).c_str(), 
+                    eeprom_read_desc(idx).c_str());
+                    
         webServer.sendContent(buff);
     }
 
@@ -282,13 +286,13 @@ void handlePhonebook()
     webServer.hasArg(PARAM_INPUT_IS_MOBILE) &&
     webServer.hasArg(PARAM_INPUT_PHONE)) 
     {
-      inputMessage += "<br>index: ";
+      inputMessage += "<br> index: ";
       inputMessage += webServer.arg(PARAM_INPUT_NUM);
-      inputMessage += "<br>isMobile: ";
+      inputMessage += "<br> isMobile: ";
       inputMessage += webServer.arg(PARAM_INPUT_IS_MOBILE);
-      inputMessage += "<br>desc: ";
+      inputMessage += "<br> desc: ";
       inputMessage += webServer.arg(PARAM_INPUT_DESC);
-      inputMessage += "<br>phone: ";
+      inputMessage += "<br> phone: ";
       inputMessage += webServer.arg(PARAM_INPUT_PHONE);
 
 
@@ -328,13 +332,13 @@ void handleSettings()
     webServer.hasArg(PARAM_INPUT_IS_PULSE) &&
     webServer.hasArg(PARAM_INPUT_IS_KEYSOUND)) 
     {
-      inputMessage += "dialPrefix: ";
+      inputMessage += "<br> dialPrefix: ";
       inputMessage += webServer.arg(PARAM_INPUT_DIALPREFIX);
-      inputMessage += "brightness: ";
+      inputMessage += "<br> brightness: ";
       inputMessage += webServer.arg(PARAM_INPUT_BRIGHTNESS);
-      inputMessage += "isPulse: ";
+      inputMessage += "<br> isPulse: ";
       inputMessage += webServer.arg(PARAM_INPUT_IS_PULSE);
-      inputMessage += "isKeySound: ";
+      inputMessage += "<br> isKeySound: ";
       inputMessage += webServer.arg(PARAM_INPUT_IS_KEYSOUND);
 
       DeviceSettings val;

@@ -1,6 +1,8 @@
 #ifndef __LED_DISPLAY_H
 #define __LED_DISPLAY_H
 
+#include "dialer_errno.h"
+
 enum Font
 {
   FNT_0,
@@ -29,6 +31,8 @@ enum Font
 void led_init();
 
 void led_print(Font left, Font right);
+
+void led_print_err(DialerErrno err);
 
 void led_drawString(char* text, int len, int x, int y);
 

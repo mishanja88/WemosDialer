@@ -2,6 +2,7 @@
 #define __PORT_H
 
 #include <Arduino.h>
+#include "dialer_errno.h"
 
 char* port_get_buffer();
 
@@ -11,7 +12,7 @@ void port_clear_buffer();
 
 void port_update_buffer(unsigned long timeout);
 
-bool port_send_accepted(String cmd, unsigned long timeout);
+DialerErrno port_send_accepted(String cmd, unsigned long timeout);
 
 void port_send(String data);
 

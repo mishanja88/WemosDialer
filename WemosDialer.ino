@@ -8,6 +8,7 @@
 #include "port.h"
 #include "i2c_keypad.h"
 #include "eeprom_utils.h"
+#include "dialer_errno.h"
 
 #define I2C_KEYPAD_ADDRESS 0x20
 i2ckeypad keyPad(I2C_KEYPAD_ADDRESS);
@@ -40,9 +41,9 @@ void set_state(State next)
 #define ITER_COUNT_INIT 3
 #define ITER_ATD_IDX 3
 
-int dial_iterations(int iterCount, int idx = 0)
+DialerErrno dial_iterations(int iterCount, int idx = 0)
 {
-    int retCode = 0;
+    DialerErrno retCode = ERR_NONE;
     
     const char *cmd[ ITER_COUNT_DIAL ] = {
         "AT", "ATM0", "ATH", "ATD...", "ATH"
@@ -50,14 +51,12 @@ int dial_iterations(int iterCount, int idx = 0)
     
     for(int iter = 0; iter < iterCount; ++iter)
     {
-        bool ret;
-    
         if(iter == ITER_ATD_IDX)
         {
             String dialCmd = eeprom_read_dialable(idx);
-            ret = port_send_accepted(dialCmd, 10000ul * (unsigned long)dialCmd.length());
+            retCode = port_send_accepted(dialCmd, 10000ul * (unsigned long)dialCmd.length());
             
-            if (ret)
+            if (retCode == ERR_NONE)
             {
                 bool needDelay = true;
                 for(int blinkCnt = 0; needDelay && blinkCnt < 100; ++blinkCnt)
@@ -88,12 +87,11 @@ int dial_iterations(int iterCount, int idx = 0)
         }
         else
         {
-            ret = port_send_accepted(cmd[iter], 3000ul);
+            retCode = port_send_accepted(cmd[iter], 3000ul);
         }
     
-        if (!ret)
+        if (retCode != ERR_NONE)
         {
-            retCode = 1 + iter;
             break;
         }
     }
@@ -118,7 +116,7 @@ void setup()
   {
     while (1) // severe failure, need endless loop
     {
-        led_print(FNT_ERR, (Font) 0);
+        led_print_err(ERR_KEYBOARD_TIMEOUT);
         sound_beep(SB_MODE_FAILURE);
         led_print(FNT_SPACE, FNT_SPACE);
         delay(200);
@@ -133,10 +131,10 @@ void setup()
   if(! g_is_wifi_mode)
   {
     // Port check in work mode. It's possible to connect modem and pass it
-    int errCode;
-    while(0 != (errCode = dial_iterations(ITER_COUNT_INIT)))
+    DialerErrno errCode;
+    while(ERR_NONE != (errCode = dial_iterations(ITER_COUNT_INIT)))
     {
-        led_print(FNT_ERR, (Font) errCode);
+        led_print_err(errCode);
         sound_beep(SB_MODE_FAILURE);
         led_print(FNT_SPACE, FNT_SPACE);
         delay(200);      
@@ -262,13 +260,13 @@ void loop()
             idx = 10*idx + g_digits[i];
         }
         
-        int retCode = dial_iterations(ITER_COUNT_DIAL, idx);        
+        DialerErrno retCode = dial_iterations(ITER_COUNT_DIAL, idx);        
         
         if(retCode != 0)
         {            
-            for(int i = 0; i < 5; ++i)
+            for(int i = 0; i < 3; ++i)
             {
-                led_print(FNT_ERR, (Font) retCode);
+                led_print_err(retCode);
                 sound_beep(SB_MODE_FAILURE);
                 led_print(FNT_SPACE, FNT_SPACE);
                 delay(200);
