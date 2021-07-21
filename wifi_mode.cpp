@@ -368,9 +368,15 @@ void handlePort()
     if (webServer.hasArg(PARAM_INPUT_TEXT))
     {
       inputMessage += "text: ";
-      inputMessage = webServer.arg(PARAM_INPUT_TEXT);
 
-      port_send(webServer.arg(PARAM_INPUT_TEXT));
+      String text = webServer.arg(PARAM_INPUT_TEXT);
+      inputMessage += text;
+
+      int idx = text.toInt();
+      if(text == "0" || idx != 0)
+         port_dial_debug_to_buffer(idx);
+      else
+         port_send(text);
     }
     else {
       inputMessage = "No message sent";

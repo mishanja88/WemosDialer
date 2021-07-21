@@ -1,7 +1,7 @@
 #include "port.h"
 #include "eeprom_utils.h"
 
-#define PORT_BUFFER_LIMIT 500
+#define PORT_BUFFER_LIMIT 1000
 char g_portBuffer[ PORT_BUFFER_LIMIT + 1];
 int g_portBufferLength;
 
@@ -74,15 +74,18 @@ bool port_send_accepted(String cmd, unsigned long timeout)
 {
   port_clear_buffer();
   port_send(cmd);
-  delay(100);
 
   unsigned long time = millis();
 
-  while ((millis() - time) < timeout)
+  for(unsigned long t = 0; t < timeout / 100; ++t)
   {
-    port_update_buffer(50);
-    if (strstr(g_portBuffer, "OK") != NULL)
-      return true;
+    port_update_buffer(100);
+    
+    for(int i = 0; i < PORT_BUFFER_LIMIT && g_portBuffer[i] != '\0'; ++i)
+    {
+      if(g_portBuffer[i] == 'O' && g_portBuffer[i+1] == 'K')
+         return true;
+    }
   }
 
   return false;
@@ -109,4 +112,60 @@ int port_dial(int idx)
     return 5;
 
   return 0;
+}
+
+String logTime(unsigned long start)
+{
+  return String("\n ms: ") + String(millis()- start, HEX) + "\n";
+}
+
+void port_dial_debug_to_buffer(int idx)
+{
+  String result = port_dial_debug(idx);
+
+  strncpy(g_portBuffer, result.c_str(), PORT_BUFFER_LIMIT);
+  g_portBufferLength = min(result.length(), (unsigned int) PORT_BUFFER_LIMIT);
+}
+
+String port_dial_debug(int idx)
+{
+  bool ret;
+  String result;
+  unsigned long start = millis();
+  
+  ret = port_send_accepted("AT", 3000ul);
+  if (!ret)
+    return result + logTime(start) + "Err 1\n" + g_portBuffer;
+
+  result += logTime(start) + g_portBuffer;
+
+  ret = port_send_accepted("ATM0", 3000ul);
+  if (!ret)
+    return result + logTime(start) + "Err 2\n" + g_portBuffer;
+
+  result += logTime(start) + g_portBuffer;
+  
+  ret = port_send_accepted("ATH", 3000ul);
+  if (!ret)
+    return result + logTime(start) + "Err 3\n" + g_portBuffer;
+
+  result += logTime(start) + g_portBuffer;
+
+
+  String dialCmd = eeprom_read_dialable(idx);
+  ret = port_send_accepted(dialCmd, 10000ul * (unsigned long)dialCmd.length());
+  if (!ret)
+    return result + logTime(start) + "Err 4\n" + g_portBuffer;
+
+  result += logTime(start) + g_portBuffer;
+
+  port_update_buffer(100000ul);
+
+  ret = port_send_accepted("ATH", 3000ul);
+  if (!ret)
+    return result + logTime(start) + "Err 5\n" + g_portBuffer;
+
+  result += logTime(start) + g_portBuffer + "\n OK!!!";
+
+  return result;
 }

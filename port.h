@@ -17,4 +17,8 @@ void port_init();
 
 int port_dial(int idx);
 
+void port_dial_debug_to_buffer(int idx);
+
+String port_dial_debug(int idx);
+
 #endif // __PORT_H
