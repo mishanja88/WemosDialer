@@ -72,7 +72,6 @@ void sound_beep(SoundBeep mode)
             delay(70);
           }
           delay(500);
-        }
       }
       break;
   }

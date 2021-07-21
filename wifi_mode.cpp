@@ -2,6 +2,7 @@
 
 #include <DNSServer.h>
 #include <ESP8266WebServer.h>
+#include <ESP8266mDNS.h>
 #include "port.h"
 #include "eeprom_utils.h"
 
@@ -407,12 +408,19 @@ void wifi_setup()
 
     dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
     dnsServer.start(53, "*", WiFi.softAPIP());
-  
-    webServer.on("/", handleRoot);
-    webServer.on("/generate_204", handleRoot); //Android captive portal
-    webServer.on("/fwlink", handleRoot); //Microsoft captive portal
-    webServer.on("/favicon.ico", handleRoot); //Another captive portal
-    
+
+    MDNS.begin("nn");
+
+    const char *roots[] = {
+      "/", "/generate_204", "/fwlink", "/favicon.ico",
+      "/connect", "/kindle-wifi/wifistub.html",
+      "/connecttest.txt", "/hotspot-detect.html",
+      "/library/test/success.html",
+      NULL
+      };
+
+    for(int i = 0; roots[i] != NULL; ++i)
+      webServer.on(roots[i], handleRoot);
     
     webServer.on("/phonebook", handlePhonebook);
     webServer.on("/settings", handleSettings);
@@ -421,10 +429,13 @@ void wifi_setup()
     
     webServer.onNotFound ( handleNotFound );
     webServer.begin();
+        
+  MDNS.addService("http", "tcp", 80);
 }
 
 void wifi_loop()
 {
+    MDNS.update();
     dnsServer.processNextRequest();
     webServer.handleClient();
 

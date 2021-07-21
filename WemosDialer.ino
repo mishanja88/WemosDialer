@@ -7,6 +7,7 @@
 #include "led_display.h"
 #include "port.h"
 #include "i2c_keypad.h"
+#include "eeprom_utils.h"
 
 #define I2C_KEYPAD_ADDRESS 0x20
 i2ckeypad keyPad(I2C_KEYPAD_ADDRESS);
@@ -133,7 +134,7 @@ void setup()
   {
     // Port check in work mode. It's possible to connect modem and pass it
     int errCode;
-    while(0 != (errCode = dial_iterations(ITER_COUNT_INIT))
+    while(0 != (errCode = dial_iterations(ITER_COUNT_INIT)))
     {
         led_print(FNT_ERR, (Font) errCode);
         sound_beep(SB_MODE_FAILURE);

@@ -11,6 +11,8 @@ void port_clear_buffer();
 
 void port_update_buffer(unsigned long timeout);
 
+bool port_send_accepted(String cmd, unsigned long timeout);
+
 void port_send(String data);
 
 void port_init();
