@@ -59,7 +59,7 @@ DialerErrno dial_iterations(int iterCount, int idx = 0)
             if (retCode == ERR_NONE)
             {
                 bool needDelay = true;
-                for(int blinkCnt = 0; needDelay && blinkCnt < 100; ++blinkCnt)
+                for(int blinkCnt = 0; needDelay && blinkCnt < 10; ++blinkCnt)
                 {
                     if(blinkCnt & 1)
                         led_print( FNT_SPACE, FNT_SPACE);
