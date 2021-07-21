@@ -1,5 +1,5 @@
 #include "led_display.h"
-
+#include "eeprom_utils.h"
 #include <LEDMatrixDriver.hpp>
 
 // This sketch draw marquee text on your LED matrix using the hardware SPI driver Library by Bartosz Bielawski.
@@ -329,7 +329,9 @@ void led_init()
 {
   // init the display
   lmd.setEnabled(true);
-  lmd.setIntensity(2);   // 0 = low, 10 = high
+  
+  DeviceSettings settings = eeprom_read_settings();
+  lmd.setIntensity(settings.brightness);   // 0 = low, 10 = high
   lmd.clear();
   lmd.display();
 

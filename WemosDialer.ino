@@ -35,14 +35,113 @@ void set_state(State next)
   g_state_millis = millis();
 }
 
+#define ITER_COUNT_DIAL 5
+#define ITER_COUNT_INIT 3
+#define ITER_ATD_IDX 3
+
+int dial_iterations(int iterCount, int idx = 0)
+{
+    int retCode = 0;
+    
+    const char *cmd[ ITER_COUNT_DIAL ] = {
+        "AT", "ATM0", "ATH", "ATD...", "ATH"
+    };
+    
+    for(int iter = 0; iter < iterCount; ++iter)
+    {
+        bool ret;
+    
+        if(iter == ITER_ATD_IDX)
+        {
+            String dialCmd = eeprom_read_dialable(idx);
+            ret = port_send_accepted(dialCmd, 10000ul * (unsigned long)dialCmd.length());
+            
+            if (ret)
+            {
+                bool needDelay = true;
+                for(int blinkCnt = 0; needDelay && blinkCnt < 100; ++blinkCnt)
+                {
+                    if(blinkCnt & 1)
+                        led_print( FNT_SPACE, FNT_SPACE);
+                    else
+                        led_print( g_digits[0], g_digits[1]);
+                    
+                    for(int pollCnt = 0; needDelay && pollCnt < 10; ++pollCnt)
+                    {
+                        port_update_buffer(100ul);
+                        
+                        char key = keyPad.get_key();
+                        if (key == last_key)
+                            continue;
+                
+                        last_key = key;
+
+                        if(key == '\0')
+                            continue;
+                        
+                        sound_beep( SB_CANCEL );
+                        needDelay = false;
+                    }
+                }
+            }
+        }
+        else
+        {
+            ret = port_send_accepted(cmd[iter], 3000ul);
+        }
+    
+        if (!ret)
+        {
+            retCode = 1 + iter;
+            break;
+        }
+    }
+    
+    return retCode;
+}
+
+
 void setup() 
 {
-  port_init();
-  
-  led_init();
-  g_is_wifi_mode = wifi_is_enabled();
   EEPROM.begin(4096);  //Initialize EEPROM
+  
+  sound_init();  
+  port_init();  
+  led_init();
 
+  Wire.begin();
+  Wire.setClock(400000);
+
+  Wire.beginTransmission(I2C_KEYPAD_ADDRESS);
+  if (Wire.endTransmission() != 0) // keypad check
+  {
+    while (1) // severe failure, need endless loop
+    {
+        led_print(FNT_ERR, (Font) 0);
+        sound_beep(SB_MODE_FAILURE);
+        led_print(FNT_SPACE, FNT_SPACE);
+        delay(200);
+    }
+  }
+
+  keyPad.init();
+  last_key = keyPad.get_key();
+  
+  g_is_wifi_mode = wifi_is_enabled();
+  
+  if(! g_is_wifi_mode)
+  {
+    // Port check in work mode. It's possible to connect modem and pass it
+    int errCode;
+    while(0 != (errCode = dial_iterations(ITER_COUNT_INIT))
+    {
+        led_print(FNT_ERR, (Font) errCode);
+        sound_beep(SB_MODE_FAILURE);
+        led_print(FNT_SPACE, FNT_SPACE);
+        delay(200);      
+    }
+  }
+  
   if (g_is_wifi_mode)
   {
     wifi_setup();
@@ -55,27 +154,8 @@ void setup()
     sound_beep(SB_MODE_WORK);
     set_state(S_INIT);
   }
-
-  Wire.begin();
-  Wire.setClock(400000);
-
-  Wire.beginTransmission(I2C_KEYPAD_ADDRESS);
-  if (Wire.endTransmission() != 0)
-  {
-    while (1)
-    {
-        led_print(FNT_ERR, (Font) 0);
-        sound_beep(SB_MODE_FAILURE);
-        led_print(FNT_SPACE, FNT_SPACE);
-        delay(200);
-    }
-  }
-
-  keyPad.init();
-  last_key = keyPad.get_key();
 }
 
-char pStrNum = '0';
 
 /*
   NO CARRIER
@@ -101,8 +181,9 @@ void loop()
     return;
   }
 
+  // inactivity timer  
   uint32_t now = millis();
-  if (now - g_state_millis > 30000)
+  if (now - g_state_millis > 30000ul)
     set_state(S_INIT);
 
   switch (g_state)
@@ -160,11 +241,18 @@ void loop()
         g_digit_index++;
 
         sound_beep( SB_NUMBER );
+        set_state(S_DIGIT); // to flush inactivity timer
       }
       break;
 
     case S_DIAL:
     {
+        if(g_digit_index == 1)
+        {
+            g_digits[1] = FNT_SPACE;
+            led_print( g_digits[0], g_digits[1]);
+        }
+        
         sound_beep( SB_DIAL );
         
         int idx = 0;
@@ -173,7 +261,8 @@ void loop()
             idx = 10*idx + g_digits[i];
         }
         
-        int retCode = port_dial(idx);
+        int retCode = dial_iterations(ITER_COUNT_DIAL, idx);        
+        
         if(retCode != 0)
         {            
             for(int i = 0; i < 5; ++i)

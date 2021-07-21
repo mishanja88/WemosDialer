@@ -13,4 +13,6 @@ enum SoundBeep
 
 void sound_beep(SoundBeep mode);
 
+void sound_init();
+
 #endif // __SOUND_BEEP_H

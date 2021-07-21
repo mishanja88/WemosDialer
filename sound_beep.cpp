@@ -1,8 +1,22 @@
 #include "sound_beep.h"
 #include <Arduino.h>
+#include "eeprom_utils.h"
+
+void sound_init()
+{
+    pinMode(D4, OUTPUT);
+}
 
 void sound_beep(SoundBeep mode)
 {
+  if(mode != SB_MODE_WIFI && mode != SB_MODE_WORK)
+  {
+      DeviceSettings settings = eeprom_read_settings();
+      if(!settings.isSoundEnabled)
+          return;
+  }
+    
+    
   switch (mode)
   {
     case SB_MODE_WIFI:
@@ -52,12 +66,10 @@ void sound_beep(SoundBeep mode)
 
     case SB_DIAL:
       {
-        for (int i = 0; i < 3; ++i)
-        {
           for (int j = 0; j < 3; ++j)
           {
-            tone(D4, 4000, 150);
-            delay(150);
+            tone(D4, 4000, 70);
+            delay(70);
           }
           delay(500);
         }
