@@ -12,8 +12,7 @@ ESP8266WebServer webServer(80);
 const char *ssid = "NaborNomera";
 const char *password = NULL; // "12345678";
 
-
-void handleRoot()
+void handleHelp()
 {  
     webServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     webServer.sendHeader("Pragma", "no-cache");
@@ -22,18 +21,25 @@ void handleRoot()
     // here begin chunked transfer
     webServer.send(200, "text/html", "");
 
-    
-    /*response->print("<!DOCTYPE html><html><head><title>Captive Portal</title></head><body>");
-    response->print("<p>This is out captive portal front page.</p>");
-    response->printf("<p>You were trying to reach: http://%s%s</p>", request->host().c_str(), request->url().c_str());
-    response->printf("<p>Try opening <a href='http://%s'>this link</a> instead</p>", WiFi.softAPIP().toString().c_str());
-    response->print("</body></html>");*/
+    webServer.sendContent(F("<html>help</html>"));
+
+    webServer.sendContent(F("")); // this tells web client that transfer is done
+    webServer.client().stop();    
+}
+void handleRoot()
+{  
+    webServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    webServer.sendHeader("Pragma", "no-cache");
+    webServer.sendHeader("Expires", "-1");
+    webServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
+    // here begin chunked transfer
+    webServer.send(200, "text/html", "");
     
     webServer.sendContent(F("" \
 "\n<html>" \
 "\n<head>" \
 "\n<meta charset='utf-8'>" \
-"\n<title>Набиратель номера — настройки</title>" \
+"\n<title>Набиратель номера</title>" \
 "\n" \
 "\n<script type='text/javascript'>" \
 "\n" \
@@ -69,6 +75,12 @@ void handleRoot()
 "\n" \
 "\n<tr>" \
 "\n <td>" \
+"\n <h1>Справка</h1>" \
+"\n <a href='/help'>Нажмите здесь, чтобы перейти на страницу справки</a>" \
+"\n </td>" \
+"\n</tr>" \
+"\n<tr>" \
+"\n <td>" \
 "\n <h1>Отладка порта RS232</h1>" \
 "\n "));
 
@@ -101,7 +113,7 @@ webServer.sendContent(F("\n <form action='/port' method='POST' autocomplete='off
 "\n   № <input type='number' name='index' value='' placeholder='Ячейка' min='0' max='99' required style='width: 6em;'>" \
 "\n  </td>" \
 "\n  <td>" \
-"\n    <input type='text' name='desc' value='' placeholder='Описание' required style='width: 100%;' pattern='[\\x00-\\x7Fа-яА-ЯёЁ]{0,28}'>" \
+"\n    <input type='text' name='desc' value='' placeholder='Описание' required style='width: 100%;' pattern='[\\x00-\\x7Fа-яА-ЯёЁ]{0,25}'>" \
 "\n  </td>" \
 "\n  </tr>" \
 "\n  <tr>" \
@@ -151,7 +163,7 @@ webServer.sendContent(F("\n <form action='/port' method='POST' autocomplete='off
 
     webServer.sendContent("'" + get_dial_prefix(settings) + "'");
 
-    webServer.sendContent(F(" required style='width: 100%;' pattern='[0-9W,]+'>" \
+    webServer.sendContent(F(" required style='width: 100%;' pattern='[0-9W,]{0,10}'>" \
 "\n </td>" \
 "\n</tr>"));
     }
@@ -426,6 +438,7 @@ void wifi_setup()
     for(int i = 0; roots[i] != NULL; ++i)
       webServer.on(roots[i], handleRoot);
     
+    webServer.on("/help", handleHelp);
     webServer.on("/phonebook", handlePhonebook);
     webServer.on("/settings", handleSettings);
     webServer.on("/port", handlePort);
@@ -445,124 +458,6 @@ void wifi_loop()
 
     port_update_buffer(200);
 }
-
-/*
-#include <DNSServer.h>
-
-#include <Arduino.h>
-#ifdef ESP32
-#include <WiFi.h>
-#include <AsyncTCP.h>
-#else
-#include <ESP8266WiFi.h>
-#include <ESPAsyncTCP.h>
-#endif
-#include <ESPAsyncWebServer.h>
-
-AsyncWebServer server(80);
-
-const char *ssid = "NaborNomera";
-const char *password = NULL; // "12345678";
-
-const byte DNS_PORT = 53;
-IPAddress apIP(8, 8, 8, 8);
-DNSServer dnsServer;
-const char *server_name = "*"; // "www.myesp32.com";  // Can be "*" to all DNS requests
-
-String responseHTML = "<!DOCTYPE html><html>"
-                      "<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
-                      "<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}"
-                      "</style></head>"
-                      "<body><h1>ESP32 Web Server</h1>"
-                      "<p>Hello World</p>"
-                      "</body></html>";
-
-
-// REPLACE WITH YOUR NETWORK CREDENTIALS
-//const char* ssid = "REPLACE_WITH_YOUR_SSID";
-//const char* password = "REPLACE_WITH_YOUR_PASSWORD";
-
-const char* PARAM_INPUT_NUM = "num";
-const char* PARAM_INPUT_PHONE = "phone";
-const char* PARAM_INPUT_DESC = "desc";
-
-// HTML web page to handle 3 input fields (input1, input2, input3)
-const char index_html_head[] PROGMEM = R"rawliteral(
-<!DOCTYPE HTML><html><head>
-  <meta charset="utf-8">
-  <title>Телефонная книга</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  </head><body>
-  <form action="/get">
-    Ячейка: <input type="number" name="num" min="0" max="99">  
-    Телефон: <input type="text" name="phone" pattern="[0-9p]{0,20}">
-    Имя: <input type="text" name="desc" pattern="[0-9A-Za-zА-Яа-я., \-]{0,30}">
-    <input type="submit" value="Записать">
-  </form><br>
-)rawliteral";
-
-const char index_html_tail[] PROGMEM = R"rawliteral(
-</body></html>)rawliteral";
-
-void notFound(AsyncWebServerRequest *request) {
-  request->send(404, "text/plain", "Not found");
-}
-
-// АЯая
-// &#1040;&#1071;&#1072;&#1103;
-
-String getTable()
-{
-  String result = R"rawliteral(
-<table border="1">
-<caption>Телефонная книга</caption>
-)rawliteral";
-
-  for(int i = 0; i < 100; ++i)
-  {
-    result += "<tr>";
-    for(int j = 0; j < 3; ++j)
-    {
-    result += "<td>";
-
-    result += String(i, DEC);
-    result += ":";
-    result += String(j, DEC);
-
-    
-    result += "</td>";
-    }
-    result += "</tr>";
-  }
-
-  result += "</table>";
-  return result;
-}
-
-void wifi_setup()
-{
-    // Serial.begin(115200);
-  WiFi.mode(WIFI_AP);
-  WiFi.softAP(ssid, password);
-  delay(100);
-  
-  WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
-
-  // Serial.println();
-  // Serial.print("IP Address: ");
-  // Serial.println(WiFi.localIP());
-
-
-  server.begin();
-  dnsServer.start(DNS_PORT, server_name, apIP);
-}
-
-void wifi_loop()
-{  
-  dnsServer.processNextRequest();
-}
-*/
-
 
 bool wifi_is_enabled()
 {
