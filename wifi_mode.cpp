@@ -5,6 +5,7 @@
 #include <ESP8266mDNS.h>
 #include "port.h"
 #include "eeprom_utils.h"
+#include "wifi_help.h"
 
 DNSServer dnsServer;
 ESP8266WebServer webServer(80);
@@ -21,7 +22,7 @@ void handleHelp()
     // here begin chunked transfer
     webServer.send(200, "text/html", "");
 
-    webServer.sendContent(F("<html>help</html>"));
+    webServer.sendContent((__FlashStringHelper *) help_html);
 
     webServer.sendContent(F("")); // this tells web client that transfer is done
     webServer.client().stop();    
