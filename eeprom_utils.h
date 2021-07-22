@@ -10,10 +10,9 @@ struct DeviceSettings
 {
    bool isSoundEnabled : 1;
    bool isToneDial : 1;
-   uint8_t reserve : 8;
+   uint8_t extraDelay : 6;
    
    uint8_t brightness;
-
    char dialPrefix[ DIAL_PREFIX_SIZE ];
 };
 

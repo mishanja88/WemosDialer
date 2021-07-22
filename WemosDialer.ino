@@ -91,7 +91,7 @@ DialerErrno dial_iterations(int iterCount, int idx = 0)
     {
       String dialCmd = eeprom_read_dialable(idx);
       port_send(dialCmd);
-      unsigned long delayTime = 5000ul + get_dial_time(dialCmd.c_str());
+      unsigned long delayTime = eeprom_read_settings().extraDelay * 1000ul + 5000ul + get_dial_time(dialCmd.c_str());
       unsigned long beginTime = millis();
 
       bool isBlink = false;

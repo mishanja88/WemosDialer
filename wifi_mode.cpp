@@ -168,7 +168,20 @@ webServer.sendContent(F("\n <form action='/port' method='POST' autocomplete='off
 "\n </td>" \
 "\n</tr>"));
     }
-        
+    
+    {
+    webServer.sendContent(F("\n" \
+    "\n<tr>" \
+    "\n <td colspan='2'>Дополнительная задержка после набора номера, 0-63 секунд<br>" \
+    "\n <input type='number' name='extraDelay' min='0' max='63' value="));
+
+    webServer.sendContent("'" + String(settings.extraDelay, DEC) + "'");
+
+    webServer.sendContent(F(" required style='width: 100%;'>" \
+    "\n </td>" \
+    "\n</tr>"));
+    }
+    
     {
 webServer.sendContent(F("\n<tr><td colspan='2'>Яркость<br><center>" \
 "\n 0 <input type='range' name='brightness' min='0' max='10' value="));
@@ -335,6 +348,7 @@ const char* PARAM_INPUT_DIALPREFIX = "dialPrefix";
 const char* PARAM_INPUT_BRIGHTNESS = "brightness";
 const char* PARAM_INPUT_IS_PULSE = "isPulse";
 const char* PARAM_INPUT_IS_KEYSOUND = "isKeySound";
+const char* PARAM_INPUT_EXTRADELAY = "extraDelay";
 
 void handleSettings()
 {
@@ -343,10 +357,13 @@ void handleSettings()
     if (webServer.hasArg(PARAM_INPUT_DIALPREFIX) &&
     webServer.hasArg(PARAM_INPUT_BRIGHTNESS) &&
     webServer.hasArg(PARAM_INPUT_IS_PULSE) &&
-    webServer.hasArg(PARAM_INPUT_IS_KEYSOUND)) 
+    webServer.hasArg(PARAM_INPUT_IS_KEYSOUND) &&
+    webServer.hasArg(PARAM_INPUT_EXTRADELAY)) 
     {
       inputMessage += "<br> dialPrefix: ";
       inputMessage += webServer.arg(PARAM_INPUT_DIALPREFIX);
+      inputMessage += "<br> extraDelay: ";
+      inputMessage += webServer.arg(PARAM_INPUT_EXTRADELAY);
       inputMessage += "<br> brightness: ";
       inputMessage += webServer.arg(PARAM_INPUT_BRIGHTNESS);
       inputMessage += "<br> isPulse: ";
@@ -357,9 +374,9 @@ void handleSettings()
       DeviceSettings val;
       strncpy(val.dialPrefix, webServer.arg(PARAM_INPUT_DIALPREFIX).c_str(), DIAL_PREFIX_SIZE);
       val.brightness = webServer.arg(PARAM_INPUT_BRIGHTNESS).toInt();
+      val.extraDelay = webServer.arg(PARAM_INPUT_EXTRADELAY).toInt();
       val.isSoundEnabled = (webServer.arg(PARAM_INPUT_IS_KEYSOUND) == String("true"));
       val.isToneDial = (webServer.arg(PARAM_INPUT_IS_PULSE) == String("false"));
-      val.reserve = 0;
       
       eeprom_write_settings(val);
     }
