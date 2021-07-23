@@ -172,7 +172,7 @@ webServer.sendContent(F("\n <form action='/port' method='POST' autocomplete='off
     {
     webServer.sendContent(F("\n" \
     "\n<tr>" \
-    "\n <td colspan='2'>Дополнительная задержка после набора номера, 0-63 секунд<br>" \
+    "\n <td colspan='2'>Дополнительная задержка<br>после набора номера, 0-63 секунд<br>" \
     "\n <input type='number' name='extraDelay' min='0' max='63' value="));
 
     webServer.sendContent("'" + String(settings.extraDelay, DEC) + "'");

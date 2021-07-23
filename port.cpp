@@ -84,7 +84,7 @@ DialerErrno port_check_accepted()
 
     for(int i = 0; failCodes[i] != NULL; ++i)
       if(strstr(g_portBuffer, failCodes[i]) != NULL)
-         return (DialerErrno)(ERR_MODEM_NO_DIALTONE + i);
+         return (DialerErrno)(ERR_MODEM_NO_CARRIER + i);
          
     if(strstr(g_portBuffer, "OK") != NULL)
        return ERR_NONE;
